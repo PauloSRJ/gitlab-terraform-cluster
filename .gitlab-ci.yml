@@ -1,0 +1,76 @@
+# This file is a template, and might need editing before it works on your project.
+# To contribute improvements to CI/CD templates, please follow the Development guide at:
+# https://docs.gitlab.com/ee/development/cicd/templates.html
+# This specific template is located at:
+# https://gitlab.com/gitlab-org/gitlab/-/blob/master/lib/gitlab/ci/templates/Terraform.gitlab-ci.yml
+image: registry.gitlab.com/gitlab-org/terraform-images/stable:latest
+
+variables:
+  DESTROY: $(cat destroy) # para destruir o cluster, defina esse campo como "true"
+  TF_ROOT: ${CI_PROJECT_DIR}
+  TF_ADDRESS: ${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/terraform/state/${CI_PROJECT_NAME}
+  ENVIRONMENT: "inhml" # Ambientes validos: inhml, inprd
+
+
+#include:
+#  - template: Terraform/Base.gitlab-ci.yml  # https://gitlab.com/gitlab-org/gitlab/blob/master/lib/gitlab/ci/templates/Terraform/Base.latest.gitlab-ci.yml
+
+cache:
+  key: example-production
+  paths:
+    - ${TF_ROOT}/.terraform
+
+before_script:
+  - cd ${TF_ROOT}
+
+stages:
+  - prepare
+  - validate
+  - build
+  - deploy
+  - cleanup
+
+init:
+  stage: prepare
+  script:
+    - gitlab-terraform init
+
+validate:
+  stage: validate
+  script:
+    - gitlab-terraform validate
+
+plan:
+  stage: build
+  script:
+    - gitlab-terraform plan -var-file=inventories/${ENVIRONMENT}.tfvars
+    - gitlab-terraform plan-json -var-file=inventories/${ENVIRONMENT}.tfvars
+  artifacts:
+    name: plan
+    paths:
+      - ${TF_ROOT}/plan.cache
+    reports:
+      terraform: ${TF_ROOT}/plan.json
+
+apply:
+  stage: deploy
+  environment:
+    name: dev
+  script:
+    - gitlab-terraform apply -var-file=inventories/${ENVIRONMENT}.tfvars
+  dependencies:
+    - plan
+  when: manual
+  only:
+    - master
+
+destroy:
+  stage: cleanup
+  dependencies:
+    - init
+  script:
+    - cd ${TF_ROOT}
+    - gitlab-terraform destroy
+  only:
+    variables:
+      - $DESTROY == "true"
