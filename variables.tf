@@ -1,13 +1,33 @@
 variable "cluster_name" {
-  default = "inhml"
+  default = "teste-inhml"
 }
 
 variable "aws_region" {
   default = "us-east-2"
 }
 
+variable "aws_account_id" {
+  default = "123456789012"
+}
+
+variable "eks_role_external_dns" {
+  default = "eks-role-external-dns"
+}
+
+variable "eks_domain_dns_url" {
+  default = "eks-domain-dns-url"
+}
+
+variable "route53_zone_id" {
+  default = "route53-zone-id"
+}
+
 variable "k8s_version" {
   default = "1.21"
+}
+
+variable "deploy_argocd" {
+  default = true
 }
 
 variable "istio_version" {
@@ -42,4 +62,19 @@ variable "auto_scale_cpu" {
     scale_down_cooldown   = 300
     scale_down_remove     = -1
   }
+}
+
+
+# ARGO CD VARIABLES
+
+variable "kubernetes_argocd_namespace" {
+  description = "Namespace to release argocd into"
+  type        = string
+  default     = "argocd"
+}
+
+variable "argocd_helm_chart_version" {
+  description = "argocd helm chart version to use"
+  type        = string
+  default     = ""
 }

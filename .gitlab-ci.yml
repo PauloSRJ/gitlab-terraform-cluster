@@ -6,21 +6,19 @@
 image: registry.gitlab.com/gitlab-org/terraform-images/stable:latest
 
 variables:
-  DESTROY: $(cat destroy) # para destruir o cluster, defina esse campo como "true"
+  DESTROY: "false" # $(cat destroy) # para destruir o cluster, defina esse campo como "true"
   TF_ROOT: ${CI_PROJECT_DIR}
   TF_ADDRESS: ${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/terraform/state/${CI_PROJECT_NAME}
-  ENVIRONMENT: "inhml" # Ambientes validos: inhml, inprd
-
-
-#include:
-#  - template: Terraform/Base.gitlab-ci.yml  # https://gitlab.com/gitlab-org/gitlab/blob/master/lib/gitlab/ci/templates/Terraform/Base.latest.gitlab-ci.yml
+  ENVIRONMENT: "inhml"
+  PROJECT_NAME: ${CI_PROJECT_NAME}
 
 cache:
-  key: example-production
+  key: "$CI_COMMIT_SHA"
   paths:
     - ${TF_ROOT}/.terraform
 
 before_script:
+  - ls -la
   - cd ${TF_ROOT}
 
 stages:
@@ -43,21 +41,23 @@ validate:
 plan:
   stage: build
   script:
-    - gitlab-terraform plan -var-file=inventories/${ENVIRONMENT}.tfvars
-    - gitlab-terraform plan-json -var-file=inventories/${ENVIRONMENT}.tfvars
+    - gitlab-terraform plan -var-file=./inventories/${ENVIRONMENT}/terraform.tfvars -lock=false
+    - gitlab-terraform plan-json -var-file=./inventories/${ENVIRONMENT}/terraform.tfvars -lock=false
   artifacts:
     name: plan
     paths:
       - ${TF_ROOT}/plan.cache
     reports:
       terraform: ${TF_ROOT}/plan.json
+    expire_in: 6 hours # your GitLab instance will have a default, you can override it like this
+    when: on_success # don't attempt to upload the docs if generating them failed
 
 apply:
   stage: deploy
   environment:
     name: dev
   script:
-    - gitlab-terraform apply -var-file=inventories/${ENVIRONMENT}.tfvars
+    - gitlab-terraform apply -lock=false
   dependencies:
     - plan
   when: manual
@@ -71,6 +71,6 @@ destroy:
   script:
     - cd ${TF_ROOT}
     - gitlab-terraform destroy
-  only:
-    variables:
-      - $DESTROY == "true"
+  rules:
+    - if: $DESTROY == "true"
+      when: always
